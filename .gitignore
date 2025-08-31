@@ -1,0 +1,5 @@
+# private
+docs/private/
+
+# test results and artifacts
+testResults.xml
