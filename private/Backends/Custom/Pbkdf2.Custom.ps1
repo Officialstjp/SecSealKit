@@ -45,7 +45,7 @@ function Invoke-PBKDF2HmacSha1_Exp {
     $hmac           = [System.Security.Cryptography.HMACSHA1]::new($PasswordBytes)
     try {
         for ($i = 1; $i -le $blocks; $i++) {                                # for every block
-            $iterBytes = ConvertTo-BigEndianUint32Bytes -Value $i           # Block index (1-based)
+            $iterBytes = ConvertTo-BigEndianUint32Bytes_exp -Value $i       # Block index (1-based)
             $msg = New-Object byte[] ($SaltBytes.Length +4)                 # Salt + Block index
             [Array]::Copy($SaltBytes, 0, $msg, 0, $SaltBytes.Length)        # Copy SaltBytes to <msg>
             [Array]::Copy($iterBytes, 0, $msg, $SaltBytes.Length, 4)        # Copy Block index to <msg>

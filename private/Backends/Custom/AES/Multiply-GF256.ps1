@@ -103,8 +103,14 @@ function Show-PolynomialRepresentation {
 }
 
 function Trace-GFMultiplication {
-    param([byte]$A, [byte]$B)
+    param(
+        [Parameter(Mandatory)][string]$AHex,
+        [Parameter(Mandatory)][string]$BHex
+    )
+    $A = ($AHex -match '^0x') ? [Convert]::ToByte($AHex.Substring(2),16) : [byte]$AHex
+    $B = ($BHex -match '^0x') ? [Convert]::ToByte($BHex.Substring(2),16) : [byte]$BHex
 
+    Write-Host ("Parsed A=0x{0:X2}  B=0x{1:X2}" -f $A,$B)
     Write-Host "Multiplying 0x$('{0:X2}' -f $A) x 0x$('{0:X2}' -f $B)"  # Using 'x' instead of ×
     Write-Host "A = $('{0:b8}' -f $A) ($(Show-PolynomialRepresentation $A))"
     Write-Host "B = $('{0:b8}' -f $B) ($(Show-PolynomialRepresentation $B))"
@@ -170,6 +176,6 @@ switch($mode) {
             Write-Host "Please provide values for both -TraceBytesA (-A) and -TraceBytesB (-B)!"
             throw
         }
-        Trace-GFMultiplication -A $TraceBytesA -B $TraceBytesB
+        Trace-GFMultiplication -AHex $TraceBytesA -BHex $TraceBytesB
     }
 }

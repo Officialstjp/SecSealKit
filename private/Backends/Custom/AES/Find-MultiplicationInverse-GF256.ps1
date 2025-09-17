@@ -1,5 +1,31 @@
 [CmdletBinding()]
-param()
+param(
+    [ValidateSet('Test','PolyDiv','PolyDeg', 'VerifyInv', 'FindInv', 'Trace')] # trace is just verbose
+    [string]$mode,
+    
+    # Test requires no parameters
+    # PolyDiv mode
+    [Alias('Divd')]
+    [byte]$Dividend = 0x53,
+    [Alias('Divs')]
+    [byte]$Divisor = 0xCA,
+
+    # PolyDeg mode
+    [Alias('degPoly','degreeValue', 'degVal')]
+    [uint16]$Polynomial = 0x11B,
+
+    # VerifyInv mode
+    [Alias('vV','verVal','verByte')]
+    [byte]$ValueToVerify = 0x53,
+    [Alias('vI','verInv','verInverse')]
+    [byte]$InverseToVerify = 0xCA,
+
+    # FindInv 
+    [Alias('Val','Byte', 'V')]
+    [byte]$Value = 0x53
+
+    # Trace takes same parameters as FindInv (Value)
+)
 
 
 function Find-MultiplicationInverse-GF256 {
@@ -21,6 +47,7 @@ function Find-MultiplicationInverse-GF256 {
     $inverse = Find-MultiplicativeInverse-GF256 0x53
     # Returns the byte that when multiplied by 0x53 in GF(2^8) equals 1
     #>
+    [CmdletBinding()]
     param(
         [ValidateRange(1,255)] # Explicitly exclude 0x00 - it has no inverse
         [byte]$Value
@@ -92,7 +119,6 @@ function Find-MultiplicationInverse-GF256 {
     Write-Verbose "Multiplicative inverse found: 0x$('{0:X2}' -f $inverse)"
     return $inverse
 }
-
 
 function Get-PolynomialDivision {
     <#
@@ -270,4 +296,49 @@ function Verify-Inverse {
     return ($result -eq 1)
 }
 
-Test-MultiplicativeInverses
+# Main execution based on mode
+switch ($mode) {
+    "Test" {
+        Test-MultiplicativeInverses
+    }
+    "PolyDiv" {
+        if (-not $Dividend -or -not $Divisor) {
+            Write-Host "Please provide values for both -Dividend (-Divd, -A) and -Divisor (-Divs, -B)!"
+            throw
+        }
+        Write-Host "Polynomial Division: 0x$('{0:X}' -f $Dividend) ÷ 0x$('{0:X}' -f $Divisor)"
+        $result = Get-PolynomialDivision -Dividend $Dividend -Divisor $Divisor
+        Write-Host "Quotient: 0x$('{0:X}' -f $($result.Quotient)), Remainder: 0x$('{0:X}' -f $($result.Remainder))"
+    }
+    "PolyDeg" {
+        if (-not $Polynomial) {
+            Write-Host "Please provide a polynomial value for -Polynomial (-Poly, -Val)!"
+            throw
+        }
+        $degree = Get-PolynomialDegree -Polynomial $Polynomial
+        Write-Host "Degree of polynomial 0x$('{0:X}' -f $Polynomial) is $degree"
+    }
+    "VerifyInv" {
+        if (-not $ValueToVerify -or -not $InverseToVerify) {
+            Write-Host "Please provide values for both -ValueToVerify (-Val, -V) and -InverseToVerify (-Inv, -I)!"
+            throw
+        }
+        Write-Host "Verifying if 0x$('{0:X2}' -f $InverseToVerify) is the inverse of 0x$('{0:X2}' -f $ValueToVerify)"
+        Verify-Inverse -Value $ValueToVerify -Inverse $InverseToVerify
+    }
+    "FindInv" {
+        if (-not $Value) {
+            Write-Host "Please provide a value for -Value (-Val, -V) to find its inverse!"
+            throw
+        }
+        $inverse = Find-MultiplicationInverse-GF256 -Value $Value
+        Write-Host "Multiplicative inverse of 0x$('{0:X2}' -f $Value) is 0x$('{0:X2}' -f $inverse)"
+    }
+    "Trace" { # trace is just verbose
+        if (-not $Value) {
+            Write-Host "Please provide a value for -Value (-Val, -V) to find its inverse!"
+            throw
+        }
+        Find-MultiplicationInverse-GF256 -Value $Value -Verbose
+    }
+}
