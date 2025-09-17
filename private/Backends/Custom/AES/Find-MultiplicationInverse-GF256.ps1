@@ -1,8 +1,22 @@
+<#
+SPDX-License-Identifier: Apache-2.0
+Copyright (c) 2025 Stefan Ploch
+#>
+
+
+<#
+.SYNOPSIS
+Multiplication inverse in a Galois Field for AES
+
+.NOTES
+This implementation is focussed on showing and understanding the operations, not performance.
+#>
+
 [CmdletBinding()]
 param(
     [ValidateSet('Test','PolyDiv','PolyDeg', 'VerifyInv', 'FindInv', 'Trace')] # trace is just verbose
     [string]$mode,
-    
+
     # Test requires no parameters
     # PolyDiv mode
     [Alias('Divd')]
@@ -20,7 +34,7 @@ param(
     [Alias('vI','verInv','verInverse')]
     [byte]$InverseToVerify = 0xCA,
 
-    # FindInv 
+    # FindInv
     [Alias('Val','Byte', 'V')]
     [byte]$Value = 0x53
 
@@ -75,9 +89,9 @@ function Find-MultiplicationInverse-GF256 {
         Write-Verbose "--- Loop iteration: a=0x$('{0:X}' -f $a), b=0x$('{0:X}' -f $b) ---"
 
         # Step 1: Divide a by b to get quotient and remainder
-        $division_result = Get-PolynomialDivision $a $b
-        $quotient = $division_result.Quotient
-        $remainder = $division_result.Remainder
+        $divisionResult = Get-PolynomialDivision $a $b
+        $quotient = $divisionResult.Quotient
+        $remainder = $divisionResult.Remainder
 
         Write-Verbose "Division: 0x$('{0:X}' -f $a) = 0x$('{0:X}' -f $quotient) × 0x$('{0:X}' -f $b) + 0x$('{0:X}' -f $remainder)"
 
@@ -148,23 +162,23 @@ function Get-PolynomialDivision {
     [uint16]$remainder = $Dividend
 
     # Find the highest bit position in the divisor
-    $divisor_degree = Get-PolynomialDegree $Divisor
+    $divisorDegree = Get-PolynomialDegree $Divisor
 
     # Perform polynomial long division, continue while the remainder has degree >= divisor degree
-    while ($remainder -ne 0 -and (Get-PolynomialDegree $remainder) -ge $divisor_degree) {
+    while ($remainder -ne 0 -and (Get-PolynomialDegree $remainder) -ge $divisorDegree) {
         # Calculate how many positions to shift the divisor
-        $remainder_degree = Get-PolynomialDegree $remainder
-        $shift_amount = $remainder_degree - $divisor_degree
+        $remainderDegree = Get-PolynomialDegree $remainder
+        $shiftAmount = $remainderDegree - $divisorDegree
 
         # Add x^shift_amount to the quotient (set the corresponding bit)
-        $quotient_term = 1 -shl $shift_amount
-        $quotient = $quotient -bxor $quotient_term
+        $quotientTerm = 1 -shl $shiftAmount
+        $quotient = $quotient -bxor $quotientTerm
 
         # Subtract (XOR) the shifted divisor from the remainder
-        $shifted_divisor = $Divisor -shl $shift_amount
-        $remainder = $remainder -bxor $shifted_divisor
+        $shiftedDivisor = $Divisor -shl $shiftAmount
+        $remainder = $remainder -bxor $shiftedDivisor
 
-        Write-Verbose "Division step: quotient_term=0x$('{0:X}' -f $quotient_term), new_remainder=0x$('{0:X}' -f $remainder)"
+        Write-Verbose "Division step: quotient_term=0x$('{0:X}' -f $quotientTerm), new_remainder=0x$('{0:X}' -f $remainder)"
     }
 
     return @{
@@ -252,22 +266,22 @@ function Test-MultiplicativeInverses {
     foreach ($test in $test_cases) {
         try {
             $val = $test.value
-            $computed_inverse = Find-MultiplicationInverse-GF256 $val
+            $computedInverse = Find-MultiplicationInverse-GF256 $val
 
             . "$PSSCriptRoot\Multiply-GF256.ps1"
 
             # Verify by multiplying: value x inverse should equal 1
-            $verification = Multiply-GF256 $val $computed_inverse
-            $is_correct = ($verification -eq 1)
+            $verification = Multiply-GF256 $val $computedInverse
+            $isCorrect = ($verification -eq 1)
 
-            $status = if ($is_correct) { "[PASS]" } else { "[FAIL]" }
-            $color = if ($is_correct) { "Green" } else { "Red" }
+            $status = if ($isCorrect) { "[PASS]" } else { "[FAIL]" }
+            $color = if ($isCorrect) { "Green" } else { "Red" }
 
-            Write-Host "$status 0x$('{0:X2}' -f $val)^(-1) = 0x$('{0:X2}' -f $computed_inverse)"
-            Write-Host "       Verification: 0x$('{0:X2}' -f $val) × 0x$('{0:X2}' -f $computed_inverse) = 0x$('{0:X2}' -f $verification)"
+            Write-Host "$status 0x$('{0:X2}' -f $val)^(-1) = 0x$('{0:X2}' -f $computedInverse)"
+            Write-Host "       Verification: 0x$('{0:X2}' -f $val) × 0x$('{0:X2}' -f $computedInverse) = 0x$('{0:X2}' -f $verification)"
 
-            if ($test.Expected -and $computed_inverse -ne $test.Expected) {
-                Write-Host "       [WARNING] Expected 0x$('{0:X2}' -f $test.Expected), got 0x$('{0:X2}' -f $computed_inverse)"
+            if ($test.Expected -and $computedInverse -ne $test.Expected) {
+                Write-Host "       [WARNING] Expected 0x$('{0:X2}' -f $test.Expected), got 0x$('{0:X2}' -f $computedInverse)"
             }
 
         } catch {

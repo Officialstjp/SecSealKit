@@ -1,3 +1,17 @@
+<#
+SPDX-License-Identifier: Apache-2.0
+Copyright (c) 2025 Stefan Ploch
+#>
+
+
+<#
+.SYNOPSIS
+Multiplication in a Galois Field for AES
+
+.NOTES
+This implementation is focussed on showing and understanding the operations, not performance.
+#>
+
 [CmdletBinding()]
 param(
     [ValidateSet('Test','ShowPoly','Trace')]
@@ -23,7 +37,7 @@ function Multiply-GF256 {
     Implements polynomial multiplication in GF(2^8) with modular reduction
     using the irreducible polynomial x^8 + x^4 + x^3 + x + ^(0x11B)
 
-    This is the mathematical foundation of the AES MixColumns operation
+    This is the mathematical foundation of the AES MixColumns operation. In AES the state is matrix-multiplied with a constant Rijndael-Galois Field
     #>
     param(
         [byte]$A,  # first operand
@@ -31,8 +45,8 @@ function Multiply-GF256 {
     )
 
     [byte]$result = 0
-    [byte]$a_copy = $A # store locally to ensure it doesnt change
-    [byte]$b_copy = $B
+    [byte]$aCopy = $A # store locally to ensure it doesnt change
+    [byte]$bCopy = $B
 
     # AES irreducible polynomial: x^8 + x^4 + x^3 + x + 1 = 0x11B
     # In 8-bit arithmetic, this becomes 0x1B (the x^8 term is implicit)
@@ -42,23 +56,23 @@ function Multiply-GF256 {
     for ($i = 0; $i -lt 8; $i++) {
         # If the lowest bit of B is set, add A to the result
         # (Addition in GF(2^8) is XOR)
-        if ($b_copy -band 1) {
-            $result = $result -bxor $a_copy
+        if ($bCopy -band 1) {
+            $result = $result -bxor $aCopy
         }
 
         # Check if a will overflow when shifted (highest bit set)
-        $carry = ($a_copy -band 0x80) -ne 0
+        $carry = ($aCopy -band 0x80) -ne 0
 
         # Shift a left (multiply by x)
-        $a_copy = [byte]($a_copy -shl 1)
+        $aCopy = [byte]($aCopy -shl 1)
 
         # If we had overflow, reduce by the irreducible polynomial
         if ($carry) {
-            $a_copy = $a_copy -bxor $irreducible
+            $aCopy = $aCopy -bxor $irreducible
         }
 
         # Shift b right for next iteration
-        $b_copy = $b_copy -shr 1
+        $bCopy = $bCopy -shr 1
     }
 
     return [byte]$result
@@ -66,7 +80,7 @@ function Multiply-GF256 {
 #
 function Test-GFMultiplication {
     # test cases
-    $test_cases = @(
+    $testCases = @(
         @{ A = 0x02; B = 0x87; Expected = 0x15 } # A = x     | A = 00000010 ; B = x^7 + x^2 + x + 1         | B = 10000111 ; Ex = x^4 + x^2 + 1               | 00010101
         @{ A = 0x03; B = 0x6E; Expected = 0xB2 } # A = x + 1 | A = 00000011 ; B = x^6 + x^5 + x^3 + x^2 + x | B = 01101110 ; Ex = x^7 + x^5 + x^4 + x         | 11110101
         @{ A = 0x02; B = 0x6E; Expected = 0xDC } # A = x     | A = 00000010 ; B = x^6 + x^5 + x^2 + x^1 + x | B = 01101110 ; Ex = x^7 + x^6 + x^4 + x^3 + x^2 | 11011100
@@ -77,7 +91,7 @@ function Test-GFMultiplication {
     Write-Host "GF(2^8) Multiplication Tests"
     Write-Host "============================"
 
-    foreach ($test in $test_cases) {
+    foreach ($test in $testCases) {
         $result = Multiply-GF256 $test.A $test.B
         $status = if ($result -eq $test.Expected) { "[PASS]" } else { "[FAIL]"}
 
@@ -117,42 +131,42 @@ function Trace-GFMultiplication {
     Write-Host ""
 
     [byte]$result = 0
-    [byte]$a_copy = $A
-    [byte]$b_copy = $B
+    [byte]$aCopy = $A
+    [byte]$bCopy = $B
     [byte]$irreducible = 0x1B
 
     for ($i = 0; $i -lt 8; $i++) {
         Write-Host "--- Iteration $i ---"
-        Write-Host "a_copy = 0x$('{0:X2}' -f $a_copy) = $('{0:b8}' -f $a_copy)"
-        Write-Host "b_copy = 0x$('{0:X2}' -f $b_copy) = $('{0:b8}' -f $b_copy)"
+        Write-Host "a_copy = 0x$('{0:X2}' -f $aCopy) = $('{0:b8}' -f $aCopy)"
+        Write-Host "b_copy = 0x$('{0:X2}' -f $bCopy) = $('{0:b8}' -f $bCopy)"
         Write-Host "result = 0x$('{0:X2}' -f $result) = $('{0:b8}' -f $result)"
 
         # Check if lowest bit of b is set
-        $add_a = $b_copy -band 1
+        $add_a = $bCopy -band 1
         Write-Host "b_copy & 1 = $add_a"
 
         if ($add_a) {
-            $old_result = $result
-            $result = $result -bxor $a_copy
-            Write-Host "  Adding a_copy: 0x$('{0:X2}' -f $old_result) XOR 0x$('{0:X2}' -f $a_copy) = 0x$('{0:X2}' -f $result)"
+            $oldResult = $result
+            $result = $result -bxor $aCopy
+            Write-Host "  Adding a_copy: 0x$('{0:X2}' -f $oldResult) XOR 0x$('{0:X2}' -f $aCopy) = 0x$('{0:X2}' -f $result)"
         }
 
         # Check for overflow before shifting
-        $carry = $a_copy -band 0x80
+        $carry = $aCopy -band 0x80
         Write-Host "carry (a_copy & 0x80) = 0x$('{0:X2}' -f $carry)"
 
         # Show the shift operation
-        $a_old = $a_copy
-        $a_copy = [byte]($a_copy -shl 1)  # Explicit cast to show truncation
-        Write-Host "a_copy << 1: 0x$('{0:X2}' -f $a_old) -> 0x$('{0:X2}' -f $a_copy)"
+        $a_old = $aCopy
+        $aCopy = [byte]($aCopy -shl 1)  # Explicit cast to show truncation
+        Write-Host "a_copy << 1: 0x$('{0:X2}' -f $a_old) -> 0x$('{0:X2}' -f $aCopy)"
 
         if ($carry) {
-            $old_a = $a_copy
-            $a_copy = $a_copy -bxor $irreducible
-            Write-Host "  Polynomial reduction: 0x$('{0:X2}' -f $old_a) XOR 0x$('{0:X2}' -f $irreducible) = 0x$('{0:X2}' -f $a_copy)"
+            $old_a = $aCopy
+            $aCopy = $aCopy -bxor $irreducible
+            Write-Host "  Polynomial reduction: 0x$('{0:X2}' -f $old_a) XOR 0x$('{0:X2}' -f $irreducible) = 0x$('{0:X2}' -f $aCopy)"
         }
 
-        $b_copy = $b_copy -shr 1
+        $bCopy = $bCopy -shr 1
         Write-Host ""
     }
 
