@@ -5,11 +5,13 @@ Copyright (c) 2025 Stefan Ploch
 
 <#
 .SYNOPSIS
-Build S-boxes for subsitution in AES
+Build S-boxes for subsitution in AES -> Sub Bytes
 
 .NOTES
 This implementation is focussed on showing and understanding the operations, not performance.
 #>
+[CmdletBinding()]
+param()
 
 function Build-AESSbox {
     <#
@@ -46,21 +48,21 @@ function Build-AESSbox {
     # Generate each S-box entry mathematically
     for ($in = 0; $in -lt 256; $in++) {
         # Step 1: Handle speacial case for 0x00 (has no multiplicative inverse)
-        Write-Host "In: $In"
         if ($in -eq 0) {
             $inverse = 0 # By convention, inverse of 0 is defined as 0 for S-box
+            Write-Verbose "Input is 0 => Inverse 0"
         } else {
             # Step 2: Find multiplicative inverse
             . "$PSSCriptRoot\Find-MultiplicationInverse-GF256.ps1"
             $inverse = Find-MultiplicationInverse-GF256 -Value $in
         }
-        Write-Host "Inverse: $Inverse"
         # Step 3: Apply affine transformation
-        $sboxValue = Apply-AffineTransformation -in $inverse -Matrix $affineMatrix -Constant $affineConstant
+        $sboxValue = Apply-AffineTransformation -InputValue $inverse -Matrix $affineMatrix -Constant $affineConstant
 
         # Store in S-box
         $sbox[$in] = $sboxValue
 
+        Write-Verbose "S[0x$('{0:X2}' -f $in)] = affine(0x$('{0:X2}' -f $inverse)) = 0x$('{0:X2}' -f $sboxValue)"
         # Show progress for first few entries
         if ($in -lt 5 -or $in % 50 -eq 0) {
             Write-Host "S[0x$('{0:X2}' -f $in)] = affine(0x$('{0:X2}' -f $inverse)) = 0x$('{0:X2}' -f $sboxValue)"
@@ -88,54 +90,100 @@ function Apply-AffineTransformation {
     .PARAMETER Constant
     The constant byte to add (0x63 for AES)
     #>
+    [CmdletBinding()]
     param(
-        [byte]$In,
+        [byte]$InputValue,
         [byte[][]]$Matrix,
         [byte]$Constant
     )
-    # Convert the input byte to an array of 8 individual bits
-    # Bit 0 is LSB (rightmost), bit 7 is MSB (leftmost)
-    [int[]]$inputBits = @(0,0,0,0,0,0,0,0)  # Pre-initialize array
+
+    # Convert input byte to bit array for matrix operations
+    # We extract bits from LSB (bit 0) to MSB (bit 7)
+    [int[]]$inputBits = @(0,0,0,0,0,0,0,0)  # Pre-initialize for safety
 
     for ($bitPos = 0; $bitPos -lt 8; $bitPos++) {
-        # Extract each bit: shift right by position, then mask with 1
-        $inputBits[$bitPos] = ($InputByte -shr $bitPos) -band 1
+        # Extract bit at position $bitPos using shift and mask
+        # Example: For input 0x53 (01010011), bit positions yield: [1,1,0,0,1,0,1,0]
+        $inputBits[$bitPos] = ($InputValue -shr $bitPos) -band 1
     }
 
-    Write-Verbose "Input byte 0x$('{0:X2}' -f $InputByte) = $('{0:b8}' -f $InputByte)"
-    Write-Verbose "Bit array: [$($inputBits -join ',')] (LSB to MSB)"
+    Write-Verbose "Processing input: 0x$('{0:X2}' -f $InputValue) = $('{0:b8}' -f $InputValue)"
+    Write-Verbose "Bit array (LSB→MSB): [$($inputBits -join ',')]"
 
     # Perform matrix multiplication in GF(2)
-    # Each output bit is the dot product of a matrix row with the input vector
+    # Each output bit = dot product of matrix row with input vector
     [byte]$result = 0
 
     for ($outputBit = 0; $outputBit -lt 8; $outputBit++) {
-        # Calculate dot product: matrix_row · input_vector
-        # In GF(2), multiplication is AND, addition is XOR
+        # Calculate dot product for this output bit position
         [int]$dotProduct = 0
 
         for ($inputBit = 0; $inputBit -lt 8; $inputBit++) {
-            # GF(2) multiplication: matrix_element AND input_bit
-            $product = $Matrix[$outputBit][$inputBit] -band $inputBits[$inputBit]
+            # GF(2) arithmetic: multiplication = AND, addition = XOR
+            $matrixElement = $Matrix[$outputBit][$inputBit]
+            $inputElement = $inputBits[$inputBit]
+            $product = $matrixElement -band $inputElement
 
-            # GF(2) addition: XOR the products together
+            # Accumulate using XOR (addition in GF(2))
             $dotProduct = $dotProduct -bxor $product
         }
 
-        # If the dot product is 1, set the corresponding bit in the result
+        # Set the output bit if dot product is 1
         if ($dotProduct -band 1) {
             $result = $result -bor (1 -shl $outputBit)
         }
 
-        Write-Verbose "Output bit $outputBit`: dot product = $dotProduct, result so far = 0x$('{0:X2}' -f $result)"
+        Write-Verbose "  Output bit $outputBit`: dot_product=$dotProduct, result=0x$('{0:X2}' -f $result)"
     }
 
-    # Step 2: Add the affine constant (XOR in GF(2))
+    # Apply the affine constant (vector addition in GF(2) = XOR)
     $finalResult = $result -bxor $Constant
 
-    Write-Verbose "After matrix: 0x$('{0:X2}' -f $result), after adding constant 0x$('{0:X2}' -f $Constant): 0x$('{0:X2}' -f $finalResult)"
+    Write-Verbose "Matrix result: 0x$('{0:X2}' -f $result) + constant 0x$('{0:X2}' -f $Constant) = 0x$('{0:X2}' -f $finalResult)"
 
     return [byte]$finalResult
 }
 
-Build-AESSbox
+function Test-SboxGeneration {
+    <#
+    .SYNOPSIS
+    Tests our S-box generation against known AES S-box values
+
+    .DESCRIPTION
+    The official AES S-box has been computed and verified by cryptographers worldwide.
+    We can test our implementation against known values to ensure correctness.
+    #>
+
+    Write-Host "Testing S-box generation against known AES values..." -ForegroundColor Cyan
+    Write-Host "===================================================" -ForegroundColor Cyan
+
+    # Generate our S-box using the mathematical construction
+    $ourSbox = Build-AESSbox
+
+    # Known AES S-box values for verification (first 16 entries)
+    $knownSbox = @(
+        0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5,  # S[0x00] to S[0x07]
+        0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76   # S[0x08] to S[0x0F]
+    )
+
+    Write-Host "Comparing first 16 S-box entries:" -ForegroundColor Yellow
+
+    $allCorrect = $true
+    for ($i = 0; $i -lt 16; $i++) {
+        $ourValue = $ourSbox[$i]
+        $expectedValue = $knownSbox[$i]
+        $isCorrect = ($ourValue -eq $expectedValue)
+        $status = if ($isCorrect) { "✅" } else { "❌"; $allCorrect = $false }
+
+        Write-Host "$status S[0x$('{0:X2}' -f $i)] = 0x$('{0:X2}' -f $ourValue) (expected 0x$('{0:X2}' -f $expectedValue))"
+    }
+
+    Write-Host ""
+    if ($allCorrect) {
+        Write-Host "[SUCCESS]: All tested S-box values match the AES standard!" -ForegroundColor Green
+    } else {
+        Write-Host "[FAILED]  Some values don't match!" -ForegroundColor Red
+    }
+}
+
+Test-SBoxGeneration
