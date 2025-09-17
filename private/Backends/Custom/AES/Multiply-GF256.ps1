@@ -47,10 +47,10 @@ function Multiply-GF256 {
         }
 
         # Check if a will overflow when shifted (highest bit set)
-        $carry = $a_copy -band 0x80
+        $carry = ($a_copy -band 0x80) -ne 0
 
         # Shift a left (multiply by x)
-        $a_copy = $a_copy -shl 1
+        $a_copy = [byte]($a_copy -shl 1)
 
         # If we had overflow, reduce by the irreducible polynomial
         if ($carry) {

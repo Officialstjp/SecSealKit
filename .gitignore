@@ -3,3 +3,5 @@ docs/private/
 
 # test results and artifacts
 testResults.xml
+
+.github/instructions/
