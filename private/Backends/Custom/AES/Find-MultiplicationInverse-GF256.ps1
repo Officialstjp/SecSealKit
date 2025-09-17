@@ -6,7 +6,7 @@ Copyright (c) 2025 Stefan Ploch
 
 <#
 .SYNOPSIS
-Multiplication inverse in a Galois Field for AES
+Multiplication inverse in a Galois Field for AES  + educational helpers
 
 .NOTES
 This implementation is focussed on showing and understanding the operations, not performance.

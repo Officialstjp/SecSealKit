@@ -5,7 +5,7 @@ Copyright (c) 2025 Stefan Ploch
 
 <#
 .SYNOPSIS
-Build S-boxes for subsitution in AES -> Sub Bytes
+Build S-boxes for subsitution in AES -> Sub Bytes + educational helpers
 
 .NOTES
 This implementation is focussed on showing and understanding the operations, not performance.
