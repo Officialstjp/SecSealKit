@@ -251,6 +251,8 @@ function Test-MultiplicativeInverses {
     .SYNOPSIS
     Tests the multiplicative inverse function with known values
     #>
+    [CmdletBinding()]
+    param()
 
     Write-Host "Testing Multiplicative Inverses in GF(2^8)"
     Write-Host "==========================================`n"

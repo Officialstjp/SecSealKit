@@ -25,6 +25,7 @@ function Build-AESSbox {
 
     This is how the AES designer actually created the S-box values!
     #>
+    [CmdletBinding()]
     param()
 
     # Affine transformation matrix A (8x8 binary matrix)
@@ -153,7 +154,9 @@ function Test-SboxGeneration {
     The official AES S-box has been computed and verified by cryptographers worldwide.
     We can test our implementation against known values to ensure correctness.
     #>
-
+    [CmdletBinding()]
+    param()
+    
     Write-Host "Testing S-box generation against known AES values..." -ForegroundColor Cyan
     Write-Host "===================================================" -ForegroundColor Cyan
 
@@ -185,5 +188,3 @@ function Test-SboxGeneration {
         Write-Host "[FAILED]  Some values don't match!" -ForegroundColor Red
     }
 }
-
-Test-SBoxGeneration
