@@ -60,7 +60,7 @@ function Resolve-CryptoBackend {
 
             $decrypt = { param([byte[]]$ct,[byte[]]$key,[byte[]]$InitVector)    Invoke-AesCbcDecrypt_Exp -CipherBytes $ct -Key $key -InitVector $InitVector }
 
-            $mac     = { param([byte[]]$data,[byte[]]$key)               Invoke-HmacSha256_Exp -Data $data -Key $key }
+            $mac     = { param([byte[]]$data,[byte[]]$key)                      Invoke-HmacSha256_Exp -Data $data -Key $key }
 
             $verify  = { param([byte[]]$data,[byte[]]$macBytes,[byte[]]$key)
                 $calc = Invoke-HmacSha256_Exp -Data $data -Key $key

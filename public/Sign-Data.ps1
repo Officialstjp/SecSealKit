@@ -72,11 +72,7 @@ function Sign-Data {
 	- Signatures are detached and stored separately from the original data
 	- Same passphrase must be used for both signing and verification
 	- HMAC-SHA256 provides strong integrity protection with shared key authentication
-
-	.LINK
-	Verify-Data
-	.LINK
-	Seal-Secret
+	
 	#>
 	$backend = Resolve-CryptoBackend -Override $CryptoProvider
 	# TODO: derive 32-byte signing key via PBKDF2-HMAC-SHA1; produce SCSIG1 string; write or return

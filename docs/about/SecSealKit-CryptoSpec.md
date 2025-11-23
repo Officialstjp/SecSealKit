@@ -7,6 +7,7 @@ This document specifies the envelope, key derivation, authenticated encryption, 
 ## 1. Envelope Overview
 
 Envelope format (string):
+SCS1 = Sealed Cryptographic Secret v1
 
 ```
 SCS1$kdf=PBKDF2-SHA1$iter=<N>$salt=<b64>$IV=<b64>$ct=<b64>$mac=<b64>
