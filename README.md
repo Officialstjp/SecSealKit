@@ -1,26 +1,31 @@
 # SecSealKit
 
-> Secure sealing toolkit for PowerShell 5.1 - Encrypt small secrets with authenticated envelopes
+> Secure sealing module for credential management from PowerShell 5.1 - Encrypt small secrets with authenticated envelopes
 
-SecSealKit provides a PowerShell 5.1 module for creating encrypted "envelopes" to safely store small secrets and artifacts in repositories or configuration files. It uses strong authenticated encryption (AES-256-CBC + HMAC-SHA256) with PBKDF2 key derivation and keeps passphrases out of repos via DPAPI keyfiles or Windows Credential Manager.
+SecSealKit is a high-performance binary PowerShell module for creating encrypted "envelopes" to safely store small secrets and artifacts in repositories or configuration files. Built on compiled C# using .NET Standard 2.0 for speed and reliability, it uses strong authenticated encryption (AES-256-CBC + HMAC-SHA256) with PBKDF2 key derivation. Passphrases are kept out of code via DPAPI keyfiles or Windows Credential Manager.
 
 ## Features
 
+- **Binary Module (v0.2+)**: Compiled C# for performance and type safety
 - **Authenticated Encryption**: SCS1 envelopes with AES-256-CBC + HMAC-SHA256 (encrypt-then-MAC)
 - **Strong Key Derivation**: PBKDF2-HMAC-SHA1 with configurable iterations (200k default)
-- **Secure Passphrase Storage**: DPAPI keyfiles, Windows Credential Manager, or SecureString
-- **Detached Signatures**: SCSIG1 integrity-only signatures using HMAC-SHA256
-- **Envelope Management**: Inspect, rotate, and migrate envelopes
-- **Dual Crypto Backends**: Production .NET backend + experimental from-scratch backend
-- **PowerShell 5.1 Compatible**: Works on Windows PowerShell 5.1+
+- **Secure Passphrase Storage**: DPAPI keyfiles, Windows Credential Manager, SecureString, or environment variables
+- **Multiple Input/Output Modes**: String, bytes, files, or pipeline
+- **Constant-Time Operations**: Timing-attack resistant MAC verification
+- **Best-Effort Memory Safety**: Secure clearing of key material
+- **Envelope Inspection**: Metadata viewing without decryption (coming soon: rotation, signatures)
+- **PowerShell 5.1+ Compatible**: Windows only (requires DPAPI/CredMan)
 
 ## Quick Start
 
 ### Installation
 
 ```powershell
+# Build the binary module
+.\scripts\Build-SecSealKit.ps1 -Configuration Release
+
 # Import the module
-Import-Module .\SecSealKit.psd1
+Import-Module .\SecSealKit.psd1 -Force
 
 # Verify installation
 Get-Command -Module SecSealKit
@@ -29,15 +34,15 @@ Get-Command -Module SecSealKit
 ### Basic Usage
 
 ```powershell
-# Seal a secret string
+# Protect a secret string (encryption)
 $securePass = Read-Host -AsSecureString "Enter passphrase"
-Seal-Secret -InputString "my-api-key-12345" -OutFile "secret.scs1" -PassphraseSecure $securePass
+Protect-Secret -InputString "my-api-key-12345" -OutFile "secret.scs1" -PassphraseSecure $securePass
 
-# Unseal the secret
-$secret = Unseal-Secret -InFile "secret.scs1" -PassphraseSecure $securePass -AsPlainText
+# Unprotect the secret (decryption)
+$secret = Unprotect-Secret -InFile "secret.scs1" -PassphraseSecure $securePass -AsPlainText
 Write-Host "Secret: $secret"
 
-# Inspect envelope metadata
+# Inspect envelope metadata (without decryption)
 Inspect-Envelope -InFile "secret.scs1"
 ```
 
@@ -45,17 +50,18 @@ Inspect-Envelope -InFile "secret.scs1"
 
 ```powershell
 # Create a DPAPI-protected keyfile (CurrentUser scope)
-$keyBytes = New-RandomBytes 32
-Write-Keyfile -Path "my-app.key" -KeyBytes $keyBytes
+# (helper cmdlets coming in v0.3)
+$keyBytes = [byte[]](1..32)
+[System.IO.File]::WriteAllBytes('my-app.key', [System.Security.Cryptography.ProtectedData]::Protect($keyBytes, $null, 'CurrentUser'))
 
-# Seal using the keyfile
-Seal-Secret -InputString "database-password" -OutFile "db.scs1" -FromKeyfile "my-app.key"
+# Protect using the keyfile
+Protect-Secret -InputString "database-password" -OutFile "db.scs1" -FromKeyfile "my-app.key"
 
-# Unseal using the keyfile
-$dbpass = Unseal-Secret -InFile "db.scs1" -FromKeyfile "my-app.key" -AsPlainText
+# Unprotect using the keyfile
+$dbpass = Unprotect-Secret -InFile "db.scs1" -FromKeyfile "my-app.key" -AsPlainText
 ```
 
-### Digital Signatures
+### Digital Signatures (Coming in v0.3)
 
 ```powershell
 # Sign data
@@ -68,16 +74,22 @@ if ($isValid) { Write-Host "+ Signature valid" } else { Write-Host "! Signature 
 
 ## Command Reference
 
-### Core Operations
+### Core Operations (v0.2)
 
-| Command | Purpose |
-|---------|---------|
-| `Seal-Secret` | Encrypt data into SCS1 envelope |
-| `Unseal-Secret` | Decrypt data from SCS1 envelope |
-| `Sign-Data` | Create detached SCSIG1 signature |
-| `Verify-Data` | Verify detached SCSIG1 signature |
-| `Rotate-Envelope` | Re-encrypt envelope with new passphrase/iterations |
-| `Inspect-Envelope` | Display envelope metadata without decrypting |
+| Command | Alias | Purpose | Status |
+|---------|-------|---------|--------|
+| `Protect-Secret` | `Seal-Secret` | Encrypt data into SCS1 envelope | ✅ Available |
+| `Unprotect-Secret` | `Unseal-Secret` | Decrypt data from SCS1 envelope | ✅ Available |
+| `Inspect-Envelope` | | Display envelope metadata | ✅ Available |
+
+### Coming in v0.3+
+
+| Command | Purpose | Target |
+|---------|---------|--------|
+| `Sign-Data` | Create detached SCSIG1 signature | v0.3 |
+| `Verify-Data` | Verify detached SCSIG1 signature | v0.3 |
+| `Rotate-Envelope` | Re-encrypt envelope with new passphrase/iterations | v0.3 |
+| `New-SecSealKeyfile` | Create DPAPI-protected keyfiles | v0.3 |
 
 ### Passphrase Sources
 
@@ -88,16 +100,7 @@ SecSealKit supports multiple passphrase sources (in order of precedence):
 3. **SecureString**: `-PassphraseSecure $secure` - In-memory SecureString
 4. **Environment Variable**: `-FromEnv <varname>` - Environment variable (dev only)
 
-### Backend Selection
 
-```powershell
-# Use production .NET backend (default)
-Seal-Secret -InputString "data" -OutFile "file.scs1" -CryptoProvider builtin
-
-# Use experimental from-scratch backend (with self-tests)
-$env:SECSEALKIT_CRYPTO_SELFTEST = '1'
-Seal-Secret -InputString "data" -OutFile "file.scs1" -CryptoProvider experimental
-```
 
 ## File Formats
 
@@ -215,55 +218,67 @@ Seal-Secret -InputString "sensitive-data" -OutFile "app.scs1" -FromCredMan "SecS
 
 ```
 SecSealKit/
-├── SecSealKit.psd1              # Module manifest
-├── SecSealKit.psm1              # Module loader
-├── public/                      # Public cmdlets
-│   ├── Seal-Secret.ps1
-│   ├── Unseal-Secret.ps1
-│   ├── Sign-Data.ps1
-│   ├── Verify-Data.ps1
-│   ├── Rotate-Envelope.ps1
-│   └── Inspect-Envelope.ps1
-├── private/                     # Internal implementation
-│   ├── Crypto.Backend.ps1       # Backend selection
-│   ├── Backends/
-│   │   ├── DotNet/              # Production .NET crypto
-│   │   └── Custom/              # Experimental implementations
-│   └── Shared/                  # Common utilities
-├── tests/                       # Pester tests
+├── SecSealKit.psd1              # Module manifest (binary module)
+├── SecSealKit.dll               # Compiled C# cmdlets
+├── src/
+│   └── SecSealKit/              # C# source code
+│       ├── Cmdlets/             # PowerShell cmdlets
+│       ├── Crypto/
+│       │   ├── Engines/         # Seal/Unseal engines
+│       │   ├── KeyDerivation/   # PBKDF2 implementation
+│       │   ├── Ciphers/         # AES-256-CBC
+│       │   ├── Authentication/  # HMAC-SHA256
+│       │   ├── Formats/         # SCS1 envelope format
+│       │   └── Utilities/       # RNG, memory, timing-safe ops
+│       └── PassphraseSources/   # KeyFile, CredMan, SecureString
+├── scripts/
+│   └── Build-SecSealKit.ps1     # Compile script
+├── tests/
+│   └── Integration.Tests.ps1    # End-to-end tests
 └── docs/                        # Architecture and specs
 ```
 
 ## Development
 
+### Building from Source
+
+```powershell
+# Prerequisites: .NET SDK 6+ or Visual Studio
+
+# Build Debug version
+.\scripts\Build-SecSealKit.ps1 -Configuration Debug
+
+# Build Release version
+.\scripts\Build-SecSealKit.ps1 -Configuration Release
+```
+
 ### Running Tests
 
 ```powershell
-# Run all tests
-Invoke-Pester ".\tests\" -Output Detailed
+# Run integration tests
+.\tests\Integration.Tests.ps1 -Verbose
 
-# Run with experimental backend testing
-$env:SECSEALKIT_CRYPTO_SELFTEST = '1'
-Invoke-Pester ".\tests\" -Output Detailed
-```
-
-### Enabling Debug Logging
-
-```powershell
-# Enable verbose output
+# Run with verbose crypto logging
 $VerbosePreference = 'Continue'
-Seal-Secret -InputString "test" -OutFile "test.scs1" -PassphraseSecure $pass -Verbose
+.\tests\Integration.Tests.ps1
 ```
+
+
 
 ## Requirements
 
-- **PowerShell**: Windows PowerShell 5.1 or later
-- **Platform**: Windows (uses DPAPI and Windows Credential Manager)
-- **Dependencies**: None beyond .NET Framework (included with PS 5.1)
+### Runtime
+- **PowerShell**: Windows PowerShell 5.1 or PowerShell 7+
+- **Platform**: Windows only (DPAPI and Windows Credential Manager required)
+- **.NET**: .NET Framework 4.7.2+ (for PS 5.1) or .NET Core (for PS 7+)
+- **Dependencies**: None - compiled binary module
+
+### Development (building from source)
+- **.NET SDK**: 6.0 or later
+- **C# 10+** compiler support
 
 ## Limitations
 
-- **File Size**: Optimized for small payloads (<1 MB)
 - **Platform**: Windows-only (due to DPAPI/CredMan dependencies)
 - **Storage**: Not a vault - no central storage or RBAC
 

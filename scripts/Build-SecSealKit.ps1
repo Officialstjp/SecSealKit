@@ -15,11 +15,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$moduleRoot = $PSScriptRoot
+# Module root is one level up from /scripts/
+$moduleRoot = Split-Path -Parent $PSScriptRoot
 $projectPath = Join-Path $moduleRoot 'src\SecSealKit\SecSealKit.csproj'
-$outputDir = Join-Path $moduleRoot 'bin'
 
-Write-Host "Building SecSealKit ($Configuration)..." -ForegroundColor Cyan
+Write-Host "`nBuilding SecSealKit ($Configuration)..." -ForegroundColor Cyan
 
 # Build the project
 dotnet build $projectPath -c $Configuration --nologo
@@ -39,4 +39,7 @@ if (Test-Path $dllSource) {
     throw "Build output not found: $dllSource"
 }
 
-Write-Host "+ Build complete. Import with: Import-Module .\SecSealKit.psd1" -ForegroundColor Green
+Write-Host "+ Build complete!`n" -ForegroundColor Green
+Write-Host "To test, run:" -ForegroundColor Yellow
+Write-Host "  Import-Module '$moduleRoot\SecSealKit.psd1' -Force" -ForegroundColor White
+Write-Host "  Get-Command -Module SecSealKit`n" -ForegroundColor White

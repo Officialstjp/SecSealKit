@@ -1,3 +1,6 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (c) 2025 Stefan Ploch */
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,7 +27,7 @@ namespace SecSealKit.Crypto.Formats;
 /// </remarks>
 internal class Scs1Format : IEnvelopeFormat
 {
-    private const string FormatVersion = "Scs1";
+    private const string FormatVersion = "SCS1";
     private const string KdfIdentifier = "PBKDF2-SHA1";
     private const int MinIterations = 10000;
     private const int MinSaltLength = 16;

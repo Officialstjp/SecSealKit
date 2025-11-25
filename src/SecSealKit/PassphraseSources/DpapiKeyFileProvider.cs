@@ -1,3 +1,6 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (c) 2025 Stefan Ploch */
+
 using System;
 using System.IO;
 using System.Security.Cryptography;
