@@ -16,6 +16,22 @@ SecSealKit is a high-performance binary PowerShell module for creating encrypted
 - **Envelope Inspection**: Metadata viewing without decryption (coming soon: rotation, signatures)
 - **PowerShell 5.1+ Compatible**: Windows only (requires DPAPI/CredMan)
 
+## Planned Features:
+- (complete Migration) Remaining v0.1 script cmdlets -> Binary cmdlets
+- Stronger KDF (Argon 2)
+- AES-GCM Support
+- ECDSA Digital Signatures
+- Certificate Report
+- Expanded Envelope Metadata Tags
+- Envelope Expiration
+- Performance Tools
+
+## Performance
+**Measured Metrics:**
+Encrypting 10485762 Bytes (10MB) with 200k Iterations:
+- v0.1 Cmdlet: 7.5 - 10s
+- v0.2 Cmdlet: ~350ms
+
 ## Quick Start
 
 ### Installation

@@ -140,7 +140,7 @@ public sealed class ProtectSecretCommand : PSCmdlet
                         ErrorCategory.ObjectNotFound,
                         FromEnv));
                 }
-                // Convert environment variable to SecureString for consistency
+                // Convert environment variable to SecureString
                 var secureEnv = new SecureString();
                 foreach (char c in envValue)
                 {
