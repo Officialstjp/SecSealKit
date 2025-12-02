@@ -95,7 +95,70 @@ Verification:
 - iv: 16 random bytes
 - RNG: System.Security.Cryptography.RandomNumberGenerator
 
-## 6. Errors and Edge Cases
+## 6. Hybrid Encryption (SCSPK1)
+
+Status: Draft
+
+This formats implements "Sealed Secrets" using RSA-OAEP and AES-CBC. It allows encryption using a public certificate
+and decryption using the corresponding private key in the Windows Certificate Store.
+
+### 6.1 Envelope Format
+
+Format (string): `SCSPK1$kid=<Thumbprint>$ek=<b64>$iv=<b64>$ct=<b64>$mac=<b64>`
+
+Where:
+- **kid**: Key ID. The SHA-1 thumbprint of the X.509 Certificate (uppercase hex). Used for key lookup.
+- **el**: Encrypted Session Key (Base64). The 64-byte Session Key encrypted using RSA-OAEP-SHA256 with the certificate's public key.
+- **iv**: 16 bytes (Base64) random IV for AES-CBC.
+- **ct**: Ciphertext (Base64) of the payload.
+- **mac**: HMAC-SHA256 (Base64) over the header and ciphertext.
+
+### 7.2 Session Key Generation
+
+For every encryption operation, a new randon Session Key is generated:
+- Length: 64 bytes
+- Source: Cryptographically Secure PRNG
+- Splitting:
+  - `EncKey` = SessionKey[0..31] (32 Bytes)
+  - `MacKey` = SessionKey[32.63] (32 Bytes)
+
+### 7.3 Encryption Process (Protect)
+
+1. Generate random 64-byte Session Key.
+2. Encrypt payload using AES-256-CBC (PKCS7 padding) with `EncKey` and random `IV`.
+3. Encrypt the 64-byte Session Key using the Certificate`s Public Key:
+   - Algorithm: RSA
+   - Padding: OAEP (SHA-256)
+4. Compute MAC using `MacKey`.
+5. Construct envelope string.
+
+### 7.4 Decryption Process (Unprotect)
+
+1. Parse `kid` from envelope.
+2. Locate Certificate in Windows Certificate Stores (`LocalMachine\My` or `CurrentUser\My`) matching `kid`.
+3. Aquire RSA Private Key (transparently handles TPM/Software keys).
+4. Decrypt `ek` using RSA-OAEP-SHA256 to recover 64-byte Session Key.
+5. Split Session Key into `EncKey` and `MacKey`.
+6. Verify `mac` (Constant Time).
+7. Decrypt `ct` using `EncKey`.
+
+
+### 7.5 MAC Calculation
+
+The MAC ensures integrity of the ciphertext and the metadata (preventing ID swapping).
+
+Input to HMAC-SHA256:
+`"SCSPK1" || 0x24 || "kid=" || Thumbprint || 0x24 ||"ek=" || Base64(ek) || 0x24 || "iv=" || Base64(iv) || 0x24 || "ct=" || Base64(ct)`
+
+(0x24 is '$').
+
+### 7.6 Security Considerations
+
+- **RSA Padding**: OAEP with SHA-256 is mandatory. PKCS1-v1.5 is forbidden.
+- **Key Size**: Certificates should be RSA 2048 or 4096 bits.
+- **TPM**: If the certificate is TPM-backed, the private key operation occurs in hardware. The application only sees the handle.
+
+## . Errors and Edge Cases
 
 - Reject envelopes with missing/extra fields or unknown parameters
 - Reject b64 decoding errors
@@ -105,7 +168,7 @@ Verification:
 - For empty plaintext, PKCS7 yields a full block; allow and handle
 - MAC mismatch → return VerifyFailed without attempting decryption
 
-## 7. Interoperability Notes
+## . Interoperability Notes
 
 - SCS1 explicitly targets PS 5.1. SCS2 (AES-GCM) to be specified separately; both must remain parseable side-by-side.
 - Passphrase sources are external to this spec; provider interface defines how passphrase bytes are obtained.

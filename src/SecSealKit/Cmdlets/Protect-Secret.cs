@@ -5,6 +5,7 @@ using System;
 using System.IO;
 using System.Management.Automation;
 using System.Security;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using SecSealKit.Crypto.Authentication;
 using SecSealKit.Crypto.Ciphers;
@@ -40,43 +41,46 @@ public sealed class ProtectSecretCommand : PSCmdlet
     # region Parameters
 
     // Input sources (mutually exclusive)
-    [Parameter(Mandatory = true, ParameterSetName = "String", Position = 0, ValueFromPipeline = true)]
+    [Parameter(Mandatory = true, ParameterSetName = "String", Position = 0, ValueFromPipeline = true, HelpMessage = "Input string to encrypt.")]
     [ValidateNotNullOrEmpty]
     public string? InputString { get; set; }
 
-    [Parameter(Mandatory = true, ParameterSetName = "Bytes")]
+    [Parameter(Mandatory = true, ParameterSetName = "Bytes", HelpMessage = "Input byte array to encrypt.")]
     [ValidateNotNull]
     public byte[]? InputBytes { get; set; }
 
-    [Parameter(Mandatory = true, ParameterSetName = "File")]
+    [Parameter(Mandatory = true, ParameterSetName = "File", HelpMessage = "Input file to read plaintext data from.")]
     [ValidateNotNullOrEmpty]
     public string? InFile { get; set; }
 
     // Output
-    [Parameter(Position = 1)]
+    [Parameter(Position = 1, HelpMessage = "Output file to save the SCS1 envelope. If not specified, outputs to console.")]
     [ValidateNotNullOrEmpty]
     public string? OutFile { get; set; }
 
     // Crypto parameters
-    [Parameter]
+    [Parameter(HelpMessage = "Number of PBKDF2 iterations for key derivation.")]
     [ValidateRange(10000, int.MaxValue)]
     public int Iterations { get; set; } = 200000;
 
     // Passphrase sources (mutually exclusive, validated in BeginProcessing)
-    [Parameter]
+    [Parameter(HelpMessage = "A SecureString containing the passphrase.")]
     public SecureString? PassphraseSecure { get; set; }
 
-    [Parameter]
+    [Parameter(HelpMessage = "A Windows Credential Manager entry containing the passphrase.")]
     [ValidateNotNullOrEmpty]
     public string? FromCredMan { get; set; }
 
-    [Parameter]
+    [Parameter(HelpMessage = "A DPAPI keyfile containing the passphrase.")]
     [ValidateNotNullOrEmpty]
     public string? FromKeyfile { get; set; }
 
-    [Parameter]
+    [Parameter(HelpMessage = "An environment variable containing the passphrase.")]
     [ValidateNotNullOrEmpty]
     public string? FromEnv { get; set; }
+
+    [Parameter(HelpMessage = "The X.509 Certificate to encrypt the secret for.")]
+    public X509Certificate2? Certificate { get; set;}
 
     #endregion
 
@@ -92,6 +96,7 @@ public sealed class ProtectSecretCommand : PSCmdlet
         if (!string.IsNullOrEmpty(FromCredMan)) passphraseSourceCount++;
         if (!string.IsNullOrEmpty(FromKeyfile)) passphraseSourceCount++;
         if (!string.IsNullOrEmpty(FromEnv)) passphraseSourceCount++;
+        if (!string.IsNullOrEmpty(Certificate?.Thumbprint)) passphraseSourceCount++;
 
         if (passphraseSourceCount == 0)
         {
@@ -149,6 +154,11 @@ public sealed class ProtectSecretCommand : PSCmdlet
                 secureEnv.MakeReadOnly();
                 _passphraseProvider = new SecureStringProvider(secureEnv);
             }
+            else if (Certificate != null)
+            {
+                WriteVerbose($"Using X.509 Certificate: {Certificate.Subject}");
+                // No setup needed
+            }
         }
         catch (Exception ex)
         {
@@ -172,27 +182,35 @@ public sealed class ProtectSecretCommand : PSCmdlet
             plaintext = GetPlainTextBytes();
             WriteVerbose($"Plaintext size: {plaintext.Length} bytes");
 
-            // Step 2: Get the passphrase
-            if (_passphraseProvider == null)
+            if (Certificate != null)
             {
-                throw new InvalidOperationException("Passphrase provider not initialized");
+                WriteVerbose($"Encrypting using X.509 Certificate: {Certificate.Thumbprint}");
+                var engine = new Scspk1Engine();
+                envelope = engine.Protect(plaintext, Certificate);
             }
-            passphrase = _passphraseProvider.GetPassphrase();
-            WriteVerbose($"Passphrase retrieved");
+            else
+            {
+                // Step 2: Get the passphrase
+                if (_passphraseProvider == null)
+                {
+                    throw new InvalidOperationException("Passphrase provider not initialized");
+                }
+                passphrase = _passphraseProvider.GetPassphrase();
+                WriteVerbose($"Passphrase retrieved");
 
-            // Step 3: Create crypto engine with dependencies
-            var kdf = new Pbkdf2HmacSha1();
-            var cipher = new Aes256Cbc();
-            var mac = new HmacSha256Mac();
-            var format = new Scs1Format();
-            var engine = new Scs1Engine(kdf, cipher, mac, format);
+                // Step 3: Create crypto engine with dependencies
+                var kdf = new Pbkdf2HmacSha1();
+                var cipher = new Aes256Cbc();
+                var mac = new HmacSha256Mac();
+                var format = new Scs1Format();
+                var engine = new Scs1Engine(kdf, cipher, mac, format);
 
-            WriteVerbose($"Encrypting with {Iterations} PBKDF2 iterations...");
+                WriteVerbose($"Encrypting with {Iterations} PBKDF2 iterations...");
 
-            // Step 4: Seal the data
-            envelope = engine.Seal(plaintext, passphrase, Iterations);
-            WriteVerbose("Encryption complete");
-
+                // Step 4: Seal the data
+                envelope = engine.Seal(plaintext, passphrase, Iterations);
+                WriteVerbose("Encryption complete");
+            }
             // Step 5: Output the envelope
             if (!string.IsNullOrEmpty(OutFile))
             {

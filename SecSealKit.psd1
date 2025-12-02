@@ -5,7 +5,7 @@
 
 @{
     RootModule        = 'SecSealKit.dll'  # Changed from .psm1
-    ModuleVersion     = '0.2.0'           # Updated version
+    ModuleVersion     = '0.3.0'           # Updated version
     GUID              = 'c8da6f22-5f84-4f8a-9e58-7f6b3e6b7c9a'
     Author            = 'Stefan Ploch'
     CompanyName       = 'Unknown'
@@ -24,23 +24,20 @@
             LicenseUri   = 'https://github.com/OfficialStjp/SecSealKit/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/OfficialStjp/SecSealKit'
             ReleaseNotes = @'
-v0.2.0 - Binary Module Migration
+v0.3.0 - Hybrid Encryption & Certificate Support
 
 Changes:
-- Migrated to compiled C# binary module for performance and type safety
-- Removed experimental crypto backend (security)
-- Cmdlet names: Seal-Secret → Protect-Secret (aliases preserved)
+- Added support for X.509 Certificates (Hybrid Encryption)
+- New SCSPK1 envelope format (RSA-OAEP + AES-256-CBC)
+- Protect-Secret: Added -Certificate parameter
+- Unprotect-Secret: Added auto-discovery of certificates in Windows Store
+- Added Sign-Data and Verify-Data for integrity checks (SCSIG1)
 
 Features:
-- SCS1 authenticated encryption (AES-256-CBC + HMAC-SHA256)
-- PBKDF2-HMAC-SHA1 with 200k default iterations
-- Multiple passphrase sources: SecureString, DPAPI keyfiles, CredMan, environment variables
-- Constant-time MAC verification
-- Best-effort secure memory clearing
-
-Compatibility:
-- PowerShell 5.1+ (Windows only)
-- SCS1 envelope format unchanged (v0.1 envelopes still work)
+- "Sealed Secrets" pattern for DevOps workflows
+- Secure offline encryption using public keys
+- Zero-config decryption on servers (auto-finds private key)
+- Detached signatures for artifact integrity
 '@
         }
     }

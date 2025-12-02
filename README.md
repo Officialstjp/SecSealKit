@@ -6,7 +6,8 @@ SecSealKit is a high-performance binary PowerShell module for creating encrypted
 
 ## Features
 
-- **Binary Module (v0.2+)**: Compiled C# for performance and type safety
+- **Binary Module (v0.3+)**: Compiled C# for performance and type safety
+- **Hybrid Encryption**: SCSPK1 envelopes using RSA-OAEP (Certificates) + AES-256-CBC
 - **Authenticated Encryption**: SCS1 envelopes with AES-256-CBC + HMAC-SHA256 (encrypt-then-MAC)
 - **Strong Key Derivation**: PBKDF2-HMAC-SHA1 with configurable iterations (200k default)
 - **Secure Passphrase Storage**: DPAPI keyfiles, Windows Credential Manager, SecureString, or environment variables
@@ -18,10 +19,11 @@ SecSealKit is a high-performance binary PowerShell module for creating encrypted
 
 ## Planned Features:
 - (complete Migration) Remaining v0.1 script cmdlets -> Binary cmdlets
+- PowerShell.SecretManagement Compatibility
+- Audit Logging (Event Logs)
 - Stronger KDF (Argon 2)
 - AES-GCM Support
 - ECDSA Digital Signatures
-- Certificate Report
 - Expanded Envelope Metadata Tags
 - Envelope Expiration
 - Performance Tools
@@ -77,7 +79,19 @@ Protect-Secret -InputString "database-password" -OutFile "db.scs1" -FromKeyfile 
 $dbpass = Unprotect-Secret -InFile "db.scs1" -FromKeyfile "my-app.key" -AsPlainText
 ```
 
-### Digital Signatures (Coming in v0.3)
+### Using Certificates (Sealed Secrets)
+
+```powershell
+# Developer (Encryption) - Needs Public Key (.cer)
+$cert = Get-PfxCertificate -FilePath ".\certs\Prod-Web.cer"
+Protect-Secret -InputString "db-password" -Certificate $cert -OutFile "db.scspk1"
+
+# Server (Decryption) - Needs Private Key in Machine Store
+# The module automatically finds the correct certificate by thumbprint
+$secret = Unprotect-Secret -InFile "db.scspk1" -AsPlainText
+```
+
+### Digital Signatures (Integrity)
 
 ```powershell
 # Sign data
@@ -90,22 +104,22 @@ if ($isValid) { Write-Host "+ Signature valid" } else { Write-Host "! Signature 
 
 ## Command Reference
 
-### Core Operations (v0.2)
+### Core Operations (v0.3)
 
 | Command | Alias | Purpose | Status |
 |---------|-------|---------|--------|
-| `Protect-Secret` | `Seal-Secret` | Encrypt data into SCS1 envelope | ✅ Available |
-| `Unprotect-Secret` | `Unseal-Secret` | Decrypt data from SCS1 envelope | ✅ Available |
-| `Inspect-Envelope` | | Display envelope metadata | ✅ Available |
+| `Protect-Secret` | `Seal-Secret` | Encrypt data into SCS1 or SCSPK1 envelope | Available |
+| `Unprotect-Secret` | `Unseal-Secret` | Decrypt data from SCS1 or SCSPK1 envelope | Available |
+| `Inspect-Envelope` | | Display envelope metadata | Available |
+| `Sign-Data` | | Create detached SCSIG1 signature | Available |
+| `Verify-Data` | | Verify detached SCSIG1 signature | Available |
 
-### Coming in v0.3+
+### Coming in v0.4+
 
 | Command | Purpose | Target |
 |---------|---------|--------|
-| `Sign-Data` | Create detached SCSIG1 signature | v0.3 |
-| `Verify-Data` | Verify detached SCSIG1 signature | v0.3 |
-| `Rotate-Envelope` | Re-encrypt envelope with new passphrase/iterations | v0.3 |
-| `New-SecSealKeyfile` | Create DPAPI-protected keyfiles | v0.3 |
+| `Rotate-Envelope` | Re-encrypt envelope with new passphrase/iterations | v0.4 |
+| `New-SecSealKeyfile` | Create DPAPI-protected keyfiles | v0.4 |
 
 ### Passphrase Sources
 
@@ -132,6 +146,18 @@ SCS1$kdf=PBKDF2-SHA1$iter=200000$salt=<base64>$IV=<base64>$ct=<base64>$mac=<base
 - **IV**: AES-CBC initialization vector (16 bytes, base64)
 - **ct**: AES-256-CBC ciphertext with PKCS7 padding (base64)
 - **mac**: HMAC-SHA256 authentication tag (base64)
+
+### SCSPK1 Envelope Format (Hybrid)
+
+```
+SCSPK1$kid=<Thumbprint>$ek=<base64>$iv=<base64>$ct=<base64>$mac=<base64>
+```
+
+- **kid**: Key ID (Certificate Thumbprint)
+- **ek**: Encrypted Session Key (RSA-OAEP-SHA256)
+- **iv**: AES-CBC initialization vector
+- **ct**: AES-256-CBC ciphertext
+- **mac**: HMAC-SHA256 authentication tag
 
 ### SCSIG1 Signature Format
 

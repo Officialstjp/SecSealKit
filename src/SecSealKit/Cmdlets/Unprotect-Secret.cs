@@ -5,6 +5,7 @@ using System;
 using System.IO;
 using System.Management.Automation;
 using System.Security;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using SecSealKit.Crypto.Authentication;
 using SecSealKit.Crypto.Ciphers;
@@ -91,15 +92,10 @@ public sealed class UnprotectSecretCommand : PSCmdlet
         if (!string.IsNullOrEmpty(FromEnv)) passphraseSourceCount++;
 
         if (passphraseSourceCount == 0)
-            {
-                ThrowTerminatingError(new ErrorRecord(
-                    new ArgumentException("Must specify exactly one passphrase source: -PassphraseSecure, -FromCredMan, -FromKeyfile, or -FromEnv"),
-                    "NoPassphraseSource",
-                    ErrorCategory.InvalidArgument,
-                    null));
-            }
-
-        if (passphraseSourceCount > 1)
+        {
+            WriteVerbose("No passphrase source provided. Assuming SCSPK1 (Certificate) envelope.");
+        }
+        else if (passphraseSourceCount > 1)
         {
             ThrowTerminatingError(new ErrorRecord(
                 new ArgumentException("Cannot specify multiple passphrase sources"),
@@ -168,26 +164,59 @@ public sealed class UnprotectSecretCommand : PSCmdlet
             string envelopeString = GetEnvelopeString();
             WriteVerbose($"Envelope length: {envelopeString.Length}");
 
-            // Step 2: Get the passphrase
-            if (_passphraseProvider == null)
+            if (envelopeString.StartsWith("SCSPK1$"))
             {
-                throw new InvalidOperationException("Passphrase provider not initialized");
+                WriteVerbose("Detected SCSPK1 envelope. Attempting certificate decryption...");
+                var engine = new Scspk1Engine();
+                plaintext = engine.Unprotect(envelopeString);
             }
-            passphrase = _passphraseProvider.GetPassphrase();
-            WriteVerbose($"Passphrase retrieved");
+            else
+            {
+                // Step 2: Get the passphrase
+                if (_passphraseProvider == null)
+                {
+                    {
+                     ThrowTerminatingError(new ErrorRecord(
+                        new ArgumentException("Symmetric envelope. A passphrase is required, but no passphrase source was provided."),
+                        "PassphraseRequired",
+                        ErrorCategory.InvalidArgument,
+                        null));
+                    }
+                }
+                else
+                {
+                    passphrase = _passphraseProvider.GetPassphrase();
+                }
 
-            // Step 3: Create crypto engine with dependencies
-            var kdf = new Pbkdf2HmacSha1();
-            var cipher = new Aes256Cbc();
-            var mac = new HmacSha256Mac();
-            var format = new Scs1Format();
-            var engine = new Scs1Engine(kdf, cipher, mac, format);
+                if (passphrase == null || passphrase.Length == 0)
+                {
+                    ThrowTerminatingError(new ErrorRecord(
+                        new ArgumentException("Failed to retrieve passphrase from the specified source"),
+                        "PassphraseRetrievalFailed",
+                        ErrorCategory.InvalidOperation,
+                        null));
+                }
 
-            WriteVerbose("Verifying MAC and decrypting...");
+                WriteVerbose($"Passphrase retrieved");
 
-            // Step 4: Unseal the envelope
-            plaintext = engine.Unseal(envelopeString, passphrase);
-            WriteVerbose($"Decryption successful ({plaintext.Length} bytes)");
+                // Step 3: Create crypto engine with dependencies
+                var kdf = new Pbkdf2HmacSha1();
+                var cipher = new Aes256Cbc();
+                var mac = new HmacSha256Mac();
+                var format = new Scs1Format();
+                var engine = new Scs1Engine(kdf, cipher, mac, format);
+
+                WriteVerbose("Verifying MAC and decrypting...");
+
+# pragma warning disable CS8604 // We throw if passphrase is null above
+
+                // Step 4: Unseal the envelope
+                plaintext = engine.Unseal(envelopeString, passphrase);
+
+# pragma warning restore CS8604
+
+                WriteVerbose($"Decryption successful ({plaintext.Length} bytes)");
+            }
 
             // Step 5: Output the plaintext
             OutputPlaintext(plaintext);
