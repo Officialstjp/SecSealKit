@@ -15,8 +15,8 @@
 
     # Cmdlets are auto-exported from the DLL
     FunctionsToExport = @()
-    CmdletsToExport   = @('Protect-Secret', 'Unprotect-Secret', 'Get-EnvelopeMetadata')
-    AliasesToExport   = @('Seal-Secret', 'Unseal-Secret', 'Inspect-Envelope')
+    CmdletsToExport   = @('Protect-Secret', 'Unprotect-Secret', 'Get-EnvelopeMetadata', 'New-Signature', 'Compare-Signature')
+    AliasesToExport   = @('Seal-Secret', 'Unseal-Secret', 'Inspect-Envelope', 'Sign-Data', 'Verify-Data')
 
     PrivateData = @{
         PSData = @{
