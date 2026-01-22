@@ -6,11 +6,11 @@ namespace SecSealKit.Crypto.Formats;
 
 public class Scspk1Envelope
 {
-    public string KeyId { get; set; } // Thumbprint
-    public byte[] EncryptedKey { get; set; }
-    public byte[] IV { get; set; }
-    public byte[] CipherText { get; set; }
-    public byte[] Mac { get; set; }
+    public string KeyId { get; set; } = string.Empty; // Thumbprint
+    public byte[] EncryptedKey { get; set; } = Array.Empty<byte>();
+    public byte[] IV { get; set; } = Array.Empty<byte>();
+    public byte[] CipherText { get; set; } = Array.Empty<byte>();
+    public byte[] Mac { get; set; } = Array.Empty<byte>();
 
     public override string ToString()
     {

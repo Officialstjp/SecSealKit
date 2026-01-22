@@ -193,8 +193,8 @@ public sealed class CompareSignatureCommand : PSCmdlet
         }
         finally
         {
-            SecureMemory.ClearPinned(data);
-            SecureMemory.ClearPinned(passphrase);
+            if (data != null) SecureMemory.ClearPinned(data);
+            if (passphrase != null) SecureMemory.ClearPinned(passphrase);
         }
     }
 
@@ -217,7 +217,7 @@ public sealed class CompareSignatureCommand : PSCmdlet
     {
         if (!string.IsNullOrEmpty(Signature))
         {
-            return Signature;
+            return Signature!;  // Not null after IsNullOrEmpty check
         }
         else if (!string.IsNullOrEmpty(SignatureFile))
         {
