@@ -1,52 +1,45 @@
 # SecSealKit
 
-> Secure sealing module for credential management from PowerShell 5.1 - Encrypt small secrets with authenticated envelopes
+[![PSGallery Version](https://img.shields.io/powershellgallery/v/SecSealKit?label=PSGallery)](https://www.powershellgallery.com/packages/SecSealKit)
+[![PSGallery Downloads](https://img.shields.io/powershellgallery/dt/SecSealKit)](https://www.powershellgallery.com/packages/SecSealKit)
+[![License](https://img.shields.io/github/license/Officialstjp/SecSealKit)](LICENSE)
 
-SecSealKit is a high-performance binary PowerShell module for creating encrypted "envelopes" to safely store small secrets and artifacts in repositories or configuration files. Built on compiled C# using .NET Standard 2.0 for speed and reliability, it uses strong authenticated encryption (AES-256-CBC + HMAC-SHA256) with PBKDF2 key derivation. Passphrases are kept out of code via DPAPI keyfiles or Windows Credential Manager.
+> Encrypt small secrets into authenticated envelopes — for PowerShell 5.1+
+
+## What is this?
+
+SecSealKit creates encrypted "envelopes" for storing secrets in git repos, config files, or anywhere you'd rather not leave plaintext lying around. Think of it as `gpg --symmetric` but PowerShell-native, with better defaults and no key management headaches.
+
+**The idea:** You have an API key, a database password, or a license token. You want to commit it to your repo (encrypted), deploy it with your configs, or pass it between machines — without building a full secrets vault infrastructure. SecSealKit gives you that.
 
 ## Features
 
-- **Binary Module (v0.3+)**: Compiled C# for performance and type safety
-- **Hybrid Encryption**: SCSPK1 envelopes using RSA-OAEP (Certificates) + AES-256-CBC
-- **Authenticated Encryption**: SCS1 envelopes with AES-256-CBC + HMAC-SHA256 (encrypt-then-MAC)
-- **Strong Key Derivation**: PBKDF2-HMAC-SHA1 with configurable iterations (200k default)
-- **Secure Passphrase Storage**: DPAPI keyfiles, Windows Credential Manager, SecureString, or environment variables
-- **Multiple Input/Output Modes**: String, bytes, files, or pipeline
-- **Constant-Time Operations**: Timing-attack resistant MAC verification
-- **Best-Effort Memory Safety**: Secure clearing of key material
-- **Envelope Inspection**: Metadata viewing without decryption (coming soon: rotation, signatures)
-- **PowerShell 5.1+ Compatible**: Windows only (requires DPAPI/CredMan)
+- **Authenticated encryption** — AES-256-CBC + HMAC-SHA256 (encrypt-then-MAC)
+- **Hybrid encryption** — RSA-OAEP + AES for certificate-based "sealed secrets"
+- **Strong key derivation** — PBKDF2 with 200k iterations by default
+- **Flexible passphrase sources** — DPAPI keyfiles, Windows Credential Manager, SecureString, or environment variables
+- **Constant-time MAC verification** — resistant to timing attacks
+- **Binary module** — compiled C# for speed (.NET Standard 2.0)
 
-## Planned Features:
-- (complete Migration) Remaining v0.1 script cmdlets -> Binary cmdlets
-- PowerShell.SecretManagement Compatibility
-- Audit Logging (Event Logs)
-- Stronger KDF (Argon 2)
-- AES-GCM Support
-- ECDSA Digital Signatures
-- Expanded Envelope Metadata Tags
-- Envelope Expiration
-- Performance Tools
+### What's coming
 
-## Performance
-**Measured Metrics:**
-Encrypting 10485762 Bytes (10MB) with 200k Iterations:
-- v0.1 Cmdlet: 7.5 - 10s
-- v0.2 Cmdlet: ~350ms
+- [ ] `Rotate-Envelope` — re-key without exposing plaintext
+- [ ] `New-SecSealKeyfile` — helper for DPAPI keyfile creation
+- [ ] Argon2 KDF option
+- [ ] AES-GCM support
+- [ ] SecretManagement vault integration
 
 ## Quick Start
 
 ### Installation
 
 ```powershell
-# Build the binary module
+# From PowerShell Gallery (recommended)
+Install-Module -Name SecSealKit -Scope CurrentUser
+
+# Or build from source
 .\scripts\Build-SecSealKit.ps1 -Configuration Release
-
-# Import the module
 Import-Module .\SecSealKit.psd1 -Force
-
-# Verify installation
-Get-Command -Module SecSealKit
 ```
 
 ### Basic Usage
@@ -68,8 +61,7 @@ Inspect-Envelope -InFile "secret.scs1"
 
 ```powershell
 # Create a DPAPI-protected keyfile (CurrentUser scope)
-# (helper cmdlets coming in v0.3)
-$keyBytes = [byte[]](1..32)
+$keyBytes = [byte[]](1..32)  # In practice, use a cryptographically random passphrase
 [System.IO.File]::WriteAllBytes('my-app.key', [System.Security.Cryptography.ProtectedData]::Protect($keyBytes, $null, 'CurrentUser'))
 
 # Protect using the keyfile
@@ -104,22 +96,22 @@ if ($isValid) { Write-Host "+ Signature valid" } else { Write-Host "! Signature 
 
 ## Command Reference
 
-### Core Operations (v0.3)
+### Available Commands
 
-| Command | Alias | Purpose | Status |
-|---------|-------|---------|--------|
-| `Protect-Secret` | `Seal-Secret` | Encrypt data into SCS1 or SCSPK1 envelope | Available |
-| `Unprotect-Secret` | `Unseal-Secret` | Decrypt data from SCS1 or SCSPK1 envelope | Available |
-| `Inspect-Envelope` | | Display envelope metadata | Available |
-| `Sign-Data` | | Create detached SCSIG1 signature | Available |
-| `Verify-Data` | | Verify detached SCSIG1 signature | Available |
+| Cmdlet | Alias | Purpose |
+|--------|-------|---------|
+| `Protect-Secret` | `Seal-Secret` | Encrypt data into SCS1 or SCSPK1 envelope |
+| `Unprotect-Secret` | `Unseal-Secret` | Decrypt data from envelope |
+| `Get-EnvelopeMetadata` | `Inspect-Envelope` | View envelope metadata without decryption |
+| `New-Signature` | `Sign-Data` | Create HMAC-SHA256 signature |
+| `Compare-Signature` | `Verify-Data` | Verify signature |
 
-### Coming in v0.4+
+### Planned
 
-| Command | Purpose | Target |
-|---------|---------|--------|
-| `Rotate-Envelope` | Re-encrypt envelope with new passphrase/iterations | v0.4 |
-| `New-SecSealKeyfile` | Create DPAPI-protected keyfiles | v0.4 |
+| Command | Purpose |
+|---------|---------|
+| `Rotate-Envelope` | Re-encrypt with new passphrase/iterations |
+| `New-SecSealKeyfile` | Create DPAPI-protected keyfiles |
 
 ### Passphrase Sources
 
@@ -172,12 +164,11 @@ SCSIG1$kdf=PBKDF2-SHA1$iter=200000$salt=<base64>$sig=<base64>
 
 ## Security Notes
 
-- **Encrypt-then-MAC**: MAC verification occurs before decryption
-- **Domain Separation**: KDF uses salt' = salt || "|scs1|" to prevent key reuse
-- **Constant-Time Comparison**: MAC verification uses timing-safe comparison
-- **Memory Clearing**: Sensitive buffers are zeroed after use where possible
-- **High Iteration Count**: Default 200k PBKDF2 iterations (tunable)
-- **No Secret Logging**: Logs contain only non-sensitive metadata
+The cryptography is intentionally boring:
+- **Encrypt-then-MAC** — industry standard, MAC verified before decryption
+- **PBKDF2 with 200k iterations** — slow enough to resist brute-force
+- **Constant-time comparison** — no timing side-channels
+- **Memory clearing** — best-effort zeroing of sensitive buffers
 
 ## Use Cases
 
@@ -214,18 +205,6 @@ if ($isValid) {
 }
 ```
 
-### Rotating Passphrases
-
-```powershell
-# Rotate to new passphrase and higher iterations
-$oldPass = Read-Host -AsSecureString "Old passphrase"
-$newPass = Read-Host -AsSecureString "New passphrase"
-
-Rotate-Envelope -InFile "old.scs1" -OutFile "new.scs1" `
-    -OldPassphraseSecure $oldPass -NewPassphraseSecure $newPass `
-    -NewIterations 500000
-```
-
 ### Bulk Operations
 
 ```powershell
@@ -234,26 +213,6 @@ Get-ChildItem "*.txt" | ForEach-Object {
     $outFile = $_.BaseName + ".scs1"
     Seal-Secret -InFile $_.FullName -OutFile $outFile -FromKeyfile "master.key"
 }
-
-# Verify multiple signatures
-$allValid = $true
-Get-ChildItem "*.scsig1" | ForEach-Object {
-    $dataFile = $_.BaseName
-    $valid = Verify-Data -InFile $dataFile -SignatureFile $_.FullName -FromKeyfile "signing.key"
-    if (-not $valid) { $allValid = $false; Write-Warning "Invalid: $dataFile" }
-}
-Write-Host "All signatures valid: $allValid"
-```
-
-### Integration with Credential Manager
-
-```powershell
-# Store passphrase in Windows Credential Manager
-$cred = Get-Credential -UserName "SecSealKit" -Message "Enter sealing passphrase"
-cmdkey /generic:"SecSealKit-MyApp" /user:$cred.UserName /pass:$cred.GetNetworkCredential().Password
-
-# Use stored passphrase
-Seal-Secret -InputString "sensitive-data" -OutFile "app.scs1" -FromCredMan "SecSealKit-MyApp"
 ```
 
 ## Module Structure
@@ -305,8 +264,6 @@ $VerbosePreference = 'Continue'
 .\tests\Integration.Tests.ps1
 ```
 
-
-
 ## Requirements
 
 ### Runtime
@@ -321,8 +278,26 @@ $VerbosePreference = 'Continue'
 
 ## Limitations
 
-- **Platform**: Windows-only (due to DPAPI/CredMan dependencies)
-- **Storage**: Not a vault - no central storage or RBAC
+- **Windows-only** — relies on DPAPI and Windows Credential Manager
+- **Not a vault** — no central storage, access control, or audit logs
+
+## Why not just use...?
+
+| Alternative | When to use it instead |
+|-------------|------------------------|
+| **Azure Key Vault / AWS Secrets Manager** | You need centralized access control, auditing, rotation policies |
+| **SecretManagement + SecretStore** | You want a local vault with a consistent API |
+| **GPG** | You need cross-platform or asymmetric encryption with key rings |
+| **DPAPI directly** | You only need machine/user-bound encryption, no portability |
+
+SecSealKit fits when you want **portable encrypted files** with a simple passphrase, certificate or DPAPI keyfile — no infrastructure, no key servers, just files you can commit, copy, or deploy.
+
+## Changelog
+
+All notable changes to SecSealKit are documented in the [CHANGELOG.md](CHANGELOG.md).
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## License
 
@@ -330,4 +305,6 @@ Apache-2.0 License. See [LICENSE](LICENSE) for details.
 
 ---
 
-**⚠️ Security Notice**: This tool handles sensitive data. Review the code, understand the security model, and test thoroughly before production use. Keep passphrases and keyfiles secure.
+**Found a bug? Have an idea?** [Open an issue](https://github.com/Officialstjp/SecSealKit/issues) — contributions welcome.
+
+**⚠️ Security Notice**: This tool handles sensitive data. Review the code, understand the security model, and test thoroughly before production use.

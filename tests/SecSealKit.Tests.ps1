@@ -16,8 +16,8 @@ Describe "On Module Import" {
             'Unseal-Secret',
             'Sign-Data',
             'Verify-Data',
-            'Rotate-Envelope',
             'Inspect-Envelope'
+            # Note: Rotate-Envelope planned for v0.4
         )
         try {
             $moduleRoot = Split-Path -Parent $PSScriptRoot

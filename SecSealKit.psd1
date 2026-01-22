@@ -8,7 +8,7 @@
     ModuleVersion     = '0.3.0'           # Updated version
     GUID              = 'c8da6f22-5f84-4f8a-9e58-7f6b3e6b7c9a'
     Author            = 'Stefan Ploch'
-    CompanyName       = 'Unknown'
+    CompanyName       = 'Stefan Ploch'
     Copyright         = '(c) 2025 Stefan Ploch. Apache-2.0'
     Description       = 'SecSealKit: Authenticated encryption for PowerShell 5.1+. Binary module with AES-256-CBC + HMAC-SHA256 SCS1 envelopes.'
     PowerShellVersion = '5.1'
@@ -26,18 +26,12 @@
             ReleaseNotes = @'
 v0.3.0 - Hybrid Encryption & Certificate Support
 
-Changes:
-- Added support for X.509 Certificates (Hybrid Encryption)
-- New SCSPK1 envelope format (RSA-OAEP + AES-256-CBC)
-- Protect-Secret: Added -Certificate parameter
-- Unprotect-Secret: Added auto-discovery of certificates in Windows Store
-- Added Sign-Data and Verify-Data for integrity checks (SCSIG1)
+- SCSPK1 hybrid encryption (RSA-OAEP + AES-256-CBC) for certificate-based "sealed secrets"
+- New Sign-Data / Verify-Data cmdlets for HMAC-SHA256 integrity checks
+- Get-EnvelopeMetadata for inspecting envelopes without decryption
+- Auto-discovery of certificates in Windows certificate stores
 
-Features:
-- "Sealed Secrets" pattern for DevOps workflows
-- Secure offline encryption using public keys
-- Zero-config decryption on servers (auto-finds private key)
-- Detached signatures for artifact integrity
+Full changelog: https://github.com/OfficialStjp/SecSealKit/blob/main/CHANGELOG.md
 '@
         }
     }

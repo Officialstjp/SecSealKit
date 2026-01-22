@@ -7,6 +7,8 @@ schema: 2.0.0
 
 # Rotate-Envelope
 
+> ⚠️ **PLANNED FOR v0.4** - This cmdlet is not yet implemented.
+
 ## SYNOPSIS
 Re-encrypts an SCS1 envelope with new passphrase, salt, IV, and optionally new iterations.
 
