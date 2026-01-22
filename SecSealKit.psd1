@@ -5,7 +5,7 @@
 
 @{
     RootModule        = 'SecSealKit.dll'  # Changed from .psm1
-    ModuleVersion     = '0.3.0'           # Updated version
+    ModuleVersion     = '0.3.1'
     GUID              = 'c8da6f22-5f84-4f8a-9e58-7f6b3e6b7c9a'
     Author            = 'Stefan Ploch'
     CompanyName       = 'Stefan Ploch'
@@ -24,6 +24,10 @@
             LicenseUri   = 'https://github.com/OfficialStjp/SecSealKit/blob/main/LICENSE'
             ProjectUri   = 'https://github.com/OfficialStjp/SecSealKit'
             ReleaseNotes = @'
+v0.3.1 - 2026-01-22
+- CI/CD workflows for GitHub Actions
+- Bugfixes and minor improvements
+
 v0.3.0 - Hybrid Encryption & Certificate Support
 
 - SCSPK1 hybrid encryption (RSA-OAEP + AES-256-CBC) for certificate-based "sealed secrets"
