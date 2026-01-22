@@ -11,7 +11,8 @@ $script:ModulePath = Join-Path $script:ModuleRoot 'SecSealKit.psd1'
 
 Describe "On Module Import" {
     It "loads the Module and all expected commands" {
-        $FunctionsToExport = @(
+        # These are aliases that point to the actual cmdlets
+        $ExpectedAliases = @(
             'Seal-Secret',
             'Unseal-Secret',
             'Sign-Data',
@@ -27,9 +28,10 @@ Describe "On Module Import" {
 
             if (-not $module) { throw 'Import-Module returned $null' }
 
-            $exportedFunctions = $module.ExportedFunctions.Keys
-            foreach ($fn in $FunctionsToExport) {
-                $exportedFunctions | Should -Contain $fn
+            # Check aliases (Seal-Secret, etc. are aliases to Protect-Secret, etc.)
+            $exportedAliases = $module.ExportedAliases.Keys
+            foreach ($alias in $ExpectedAliases) {
+                $exportedAliases | Should -Contain $alias
             }
         } catch {
             throw "Failed to import module or verify exports: $($_.Exception.Message)"
@@ -37,29 +39,34 @@ Describe "On Module Import" {
     }
 }
 
-Describe "SCS1 end-to-end (builtin)" {
+Describe "SCS1 end-to-end" {
     BeforeAll {
-        if (-not (Get-Module -ListAvailable | Where-Object { $_.Name -eq 'SecSealKit' })) {
-            Import-Module (Join-Path (Split-Path -Parent $PSScriptRoot) 'SecSealKit.psd1') -Force | Out-Null
-        }
+        $moduleRoot = Split-Path -Parent $PSScriptRoot
+        Import-Module (Join-Path $moduleRoot 'SecSealKit.psd1') -Force
     }
-    It 'seals and unseas a string round-trip' {
+    It 'seals and unseals a string round-trip' {
         $tmp = Join-Path $env:TEMP ("scs1_{0}.txt" -f ([guid]::NewGuid().ToString('n')))
         $sec = ConvertTo-SecureString -String 'p@ssw0rd' -AsPlainText -Force
-        Seal-Secret -InputString 'hello world' -OutFile $tmp -PassphraseSecure $sec -Iterations 50000 -CryptoProvider builtin
+        Seal-Secret -InputString 'hello world' -OutFile $tmp -PassphraseSecure $sec -Iterations 50000
         Test-Path $tmp | Should -BeTrue
-        $plain = Unseal-Secret -InFile $tmp -PassphraseSecure $sec -AsPlainText -CryptoProvider builtin
+        $plain = Unseal-Secret -InFile $tmp -PassphraseSecure $sec -AsPlainText
         $plain | Should -Be 'hello world'
         Remove-Item -LiteralPath $tmp -ErrorAction SilentlyContinue
     }
     It "fails MAC verification on tamper" {
         $tmp = Join-Path $env:TEMP ("scs1_{0}.txt" -f ([guid]::NewGuid().ToString('n')))
         $sec = ConvertTo-SecureString -String 'p@ssw0rd' -AsPlainText -Force
-        Seal-Secret -InputString 'data' -OutFile $tmp -PassphraseSecure $sec -Iterations 50000 -CryptoProvider builtin
+        Seal-Secret -InputString 'data' -OutFile $tmp -PassphraseSecure $sec -Iterations 50000
         $envText = Get-Content -Raw -LiteralPath $tmp
-        # Tamper: flip last char
-        $tampered = $envText.Substring(0, $envText.Length-1) + 'A'
-        { Unseal-Secret -Envelope $tampered -PassphraseSecure $sec -CryptoProvider builtin } | Should -Throw
+        # Tamper: flip a character in the middle of the ciphertext
+        $parts = $envText.Split('$')
+        $ctIndex = ($parts | ForEach-Object { $i = 0 } { if ($_.StartsWith('ct=')) { $i }; $i++ })
+        $ct = $parts[$ctIndex].Substring(3)
+        $chars = $ct.ToCharArray()
+        $chars[20] = if ($chars[20] -eq 'A') { 'B' } else { 'A' }
+        $parts[$ctIndex] = "ct=" + ($chars -join '')
+        $tampered = $parts -join '$'
+        { Unseal-Secret -Envelope $tampered -PassphraseSecure $sec -ErrorAction Stop } | Should -Throw
         Remove-Item -LiteralPath $tmp -ErrorAction SilentlyContinue
     }
 }

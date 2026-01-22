@@ -55,13 +55,11 @@ jobs:
           Import-Module .\SecSealKit.psd1 -Force
 
           $config = New-PesterConfiguration
-          $config.Run.Path = './tests'
+          $config.Run.Path = './tests/SecSealKit.Tests.ps1'
+          $config.Run.Exit = $true
           $config.Output.Verbosity = 'Detailed'
 
-          $result = Invoke-Pester -Configuration $config
-          if ($result.FailedCount -gt 0) {
-              throw "$($result.FailedCount) test(s) failed"
-          }
+          Invoke-Pester -Configuration $config
 
       - name: Update module version
         shell: pwsh
